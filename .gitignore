@@ -1,0 +1,13 @@
+build/
+
+.cache/
+.vscode/
+.idea/
+*.swp
+*.swo
+*~
+
+*.o
+*.a
+*.so
+nat
