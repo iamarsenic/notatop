@@ -15,8 +15,7 @@ int parse_meminfo(SystemMemory *mem) {
 
 	mem->mem_total		= 0;
 	mem->mem_available	= 0;
-	mem->swap_total		= 0;
-	mem->swap_free		= 0;
+	mem->mapped			= 0;
 
 	while (fgets(buffer, sizeof(buffer), file) != NULL) {
 		buffer[strcspn(buffer, "\r\n")] = 0;
@@ -33,10 +32,8 @@ int parse_meminfo(SystemMemory *mem) {
 			mem->mem_total = val;
 		} else if (strcmp(key, "MemAvailable") == 0) {
 			mem->mem_available = val;
-		} else if (strcmp(key, "SwapTotal") == 0) {
-			mem->swap_total = val;
-		} else if (strcmp(key, "SwapFree") == 0) {
-			mem->swap_free = val;
+		} else if (strcmp(key, "Mapped") == 0) {
+			mem->mapped = val;
 		}
 	}
 

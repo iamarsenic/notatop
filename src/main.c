@@ -13,6 +13,7 @@
 
 #include "../include/read.h"
 #include "../include/meminfo.h"
+#include "../include/logger.h"
 
 volatile sig_atomic_t keep_running = 1;
 
@@ -38,7 +39,7 @@ void handle_sigint(int sig) {
 typedef struct {
     char type_path[256];
     char temp_path[256];
-    char name[128];
+    char name[64];
     int temp;
 } ThermalZone;
 
@@ -50,22 +51,26 @@ typedef struct {
     int start_y;
 } MonitorWindow;
 
-MonitorWindow temp_win;
-MonitorWindow type_win;
+MonitorWindow thermal_win;
 MonitorWindow mem_win;
 
 int main() {
+	init_logging();
+
     signal(SIGINT, handle_sigint);
     signal(SIGTERM, handle_sigint);
 
-    glob_t g_zones;
-    // Ищем сами папки thermal_zone*, чтобы дальше гибко цеплять файлы внутри них
-    if (glob("/sys/class/thermal/thermal_zone*", 0, NULL, &g_zones) != 0) {
-        fprintf(stderr, "[!] Failed to find thermal zones\n");
-    }
+    glob_t g_zones = {0};
+	size_t zone_count = 0;
+	int glob_success = 0;
 
-    size_t zone_count = g_zones.gl_pathc;
-    if (zone_count > MAX_ZONES) zone_count = MAX_ZONES;
+    if (glob("/sys/class/thermal/thermal_zone*", 0, NULL, &g_zones) == 0) {
+		glob_success = 1;
+		zone_count = g_zones.gl_pathc;
+		if (zone_count > MAX_ZONES) zone_count = MAX_ZONES;
+	} else {
+		fprintf(stderr, "[!] Failed to find thermal zones\n");
+    }
 
     ThermalZone zones[MAX_ZONES];
 
@@ -81,99 +86,95 @@ int main() {
     noecho();       // Don't echo input
     curs_set(0);    // Hiding cursor
 
-    // Фиксируем нормальную высоту окон, чтобы всё влезало и не было артефактов
     int win_height = (int)zone_count + 4;
     if (win_height < 8) win_height = 8;
 
     // Thermal zones window  
-    // Temp window
-    temp_win.height  = win_height;
-    temp_win.width   = 20;
-    temp_win.start_y = 2;
-    temp_win.start_x = 45;
-    WINDOW *tempwin  = newwin(temp_win.height, temp_win.width, temp_win.start_y, temp_win.start_x);
-    
-    // Type window
-    type_win.height  = win_height;
-    type_win.width   = 40;
-	type_win.start_y = 2;
-    type_win.start_x = 5;
-    WINDOW *typewin  = newwin(type_win.height, type_win.width, type_win.start_y, type_win.start_x);
+	int win_h, win_w;
+    thermal_win.height  = win_height;
+    thermal_win.width   = 40;
+	thermal_win.start_y = 2 + win_height;
+    thermal_win.start_x = 5;
+    WINDOW *thermal_win_str  = newwin(thermal_win.height, thermal_win.width, thermal_win.start_y, thermal_win.start_x);
 
 	// Mem window
 	mem_win.height	 = win_height;
-	mem_win.width	 = 60;
-	mem_win.start_y	 = 2;
-	mem_win.start_x	 = 65;
+	mem_win.width	 = 35;
+	mem_win.start_y	 = 2 + win_height;
+	mem_win.start_x	 = 45;
 	WINDOW *memwin	 = newwin(mem_win.height, mem_win.width, mem_win.start_y, mem_win.start_x);
 
-	wtimeout(tempwin, 100);
-    wtimeout(typewin, 100);
+	wtimeout(thermal_win.win, 100);
 	wtimeout(memwin, 100);
 
 	// Memory
 	SystemMemory mem;
 
     keypad(stdscr, TRUE);
-    
-    while(keep_running) {
-        werase(tempwin);
-        werase(typewin);
+
+	while(keep_running) {
+        werase(thermal_win_str);
 		werase(memwin);
 
-        box(tempwin, 0, 0);
-        box(typewin, 0, 0);
+        box(thermal_win_str, 0, 0);
 		box(memwin, 0, 0);
         
         time_t now = time(NULL);
         struct tm *t = localtime(&now);
         char time_str[20];
         strftime(time_str, sizeof(time_str), "%H:%M:%S", t);
-        
-        mvwprintw(typewin, 0, 3, " NotATop v1.1 | %s ", time_str);
-        mvwprintw(typewin, 0, 30, " Thermal ");
-		mvwprintw(memwin, 0, 3, " Memory Info ");
+		
+		// yay 1.15 is release :3
+        mvwprintw(thermal_win_str, 0, 3, " NotATop v1.15 | %s ", time_str);
+        mvwprintw(thermal_win_str, win_height - 1, 3, " Thermal ");
+		mvwprintw(memwin, win_height - 1, 3, " Memory Info ");
 
         for (size_t i = 0; i < zone_count; i++) {
-            read_string(zones[i].type_path, (char (*)[64])zones[i].name, 1, 64);
-
+            read_string(zones[i].type_path, &zones[i].name, 1, sizeof(zones[i].name));
             long temp_raw = read_long(zones[i].temp_path);
 
             if (temp_raw != -1) {
                 int temp_c = (int)(temp_raw / 1000.0);
-                mvwprintw(typewin, 1 + (int)i, 2, "[%zu] %s", i, zones[i].name);
-                mvwprintw(tempwin, 1 + (int)i, 2, "[%zu] %d°C", i, temp_c);
+                mvwprintw(thermal_win_str, 1 + (int)i, 2, "[%zu] %-25s", i, zones[i].name);
+				mvwprintw(thermal_win_str, 1 + (int)i, 35, "%dC", temp_c);
             }
         }
 
 		if (parse_meminfo(&mem) == 0) {
-			char total_str[32], avail_str[32], used_str[32];
+			char total_str[32];
+			char avail_str[32];
+			char used_str[32];
+			char mapped_str[32];
 
 			format_bytes(mem.mem_total, total_str, sizeof(total_str));
 			format_bytes(mem.mem_available, avail_str, sizeof(avail_str));
+			format_bytes(mem.mapped, mapped_str, sizeof(mapped_str));
 
 			long used_kb = mem.mem_total - mem.mem_available;
 			format_bytes(used_kb, used_str, sizeof(used_str));
 
-			mvwprintw(memwin, 1, 2, "Total:\t%s", total_str);
-			mvwprintw(memwin, 2, 2, "Used:\t\t%s", used_str);
-			mvwprintw(memwin, 3, 2, "Available:\t%s", avail_str);
+			mvwprintw(memwin, 1, 2, "Total:           %s", total_str);
+			mvwprintw(memwin, 2, 2, "Used:            %s", used_str);
+			mvwprintw(memwin, 3, 2, "Available:       %s", avail_str);
+			mvwprintw(memwin, 4, 2, "Mapped:          %s", mapped_str);
 		} else {
 			mvwprintw(memwin, 1, 2, "[!] Error: Failed to read meminfo: %s", strerror(errno));
+			fprintf(stderr, "[!] Main: Failed to read meminfo: %s", strerror(errno));
 		}
-        mvwprintw(typewin, type_win.height - 2, 2, "Ctrl+C to exit");
-        
-        wrefresh(tempwin);
-        wrefresh(typewin);
+
+        mvwprintw(thermal_win_str, thermal_win.height - 2, 2, "Ctrl+C to exit");
+
+        wrefresh(thermal_win_str);
 		wrefresh(memwin);
     }
-
-    delwin(tempwin);
-    delwin(typewin);
+    delwin(thermal_win_str);
 	delwin(memwin);
     endwin();
 
-    globfree(&g_zones);
+    if (glob_success) {
+		globfree(&g_zones);
+	}
+
     printf("Exiting...\n");
     return EXIT_SUCCESS;
 }

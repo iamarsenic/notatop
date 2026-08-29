@@ -4,11 +4,13 @@ project(NotATop C)
 set(CMAKE_C_STANDARD 11)
 set(CMAKE_C_FLAGS "${CMAKE_C_FLAGS} -march=native -flto -O3 -pipe -Wall -Wextra")
 set(CMAKE_BUILD_TYPE Debug)
+add_compile_options(-g)
 
 add_executable(nat
 	src/main.c
 	src/read.c
 	src/meminfo.c
+	src/logger.c
 )
 
 find_package(Curses REQUIRED)
