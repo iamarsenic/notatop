@@ -1,5 +1,5 @@
 #define MAX_ZONES 10
-#define NOTATOP_VERSION "1.15.1"
+#define NOTATOP_VERSION "1.16.0" // pneumonoultramicroscopicsilicovolcanoconiosis
 
 #include <stdlib.h>
 #include <stdio.h>
@@ -18,6 +18,7 @@
 
 volatile sig_atomic_t keep_running = 1;
 
+// this needs because i dont know how B in KB
 void format_bytes(long kb, char *dest, size_t dest_size) {
 	double value = (double)kb;
 
@@ -32,6 +33,7 @@ void format_bytes(long kb, char *dest, size_t dest_size) {
 	snprintf(dest, dest_size, "%.4f %s", value, units[i]);
 }
 
+// use CTRL + C
 void handle_sigint(int sig) {
     (void)sig;
     keep_running = 0;
@@ -65,6 +67,7 @@ int main() {
 	size_t zone_count = 0;
 	int glob_success = 0;
 
+	// so smart thing so smart does smart things
     if (glob("/sys/class/thermal/thermal_zone*", 0, NULL, &g_zones) == 0) {
 		glob_success = 1;
 		zone_count = g_zones.gl_pathc;
@@ -86,6 +89,21 @@ int main() {
     cbreak();       // Line buffering disabled
     noecho();       // Don't echo input
     curs_set(0);    // Hiding cursor
+
+	// new minor update: i added this.. just watch
+	if (has_colors()) {
+        start_color();
+		use_default_colors(); 
+		
+		init_pair(4, -1, -1); // hyprland users starting use my util
+		
+        // (70-79°C)
+        init_pair(1, COLOR_YELLOW, -1); // yellow is normal btw
+        // (80-89°C)
+        init_pair(2, COLOR_RED, -1); // red means be accurated with compilation
+        // (90-110°C)
+        init_pair(3, COLOR_BLACK, COLOR_RED); // black means you pc is lava
+    }
 
     int win_height = (int)zone_count + 4;
     if (win_height < 8) win_height = 8;
@@ -125,6 +143,9 @@ int main() {
         werase(thermal_win_str);
 
         box(thermal_win_str, 0, 0);
+        werase(thermal_win_str);
+
+        box(thermal_win_str, 0, 0);
 		box(memwin, 0, 0);
         
         time_t now = time(NULL);
@@ -142,8 +163,40 @@ int main() {
             if (temp_raw != -1) {
                 int temp_c = (int)(temp_raw / 1000.0);
                 mvwprintw(thermal_win_str, 1 + (int)i, 2, "[%zu] %-25s", i, zones[i].name);
-				mvwprintw(thermal_win_str, 1 + (int)i, 35, "%dC", temp_c);
-            }
+
+                // --- COLORIZED LOGIC ---
+                int color_pair = 0;
+                if (temp_c >= 70 && temp_c < 80) {
+                    color_pair = 1; // yellow
+                } else if (temp_c >= 80 && temp_c < 90) {
+                    color_pair = 2; // red
+                } else if (temp_c >= 90 && temp_c <= 110) {
+                    color_pair = 3; // black on red
+                }
+
+                // plz use colorized terminals
+                if (color_pair > 0) {
+                    if (color_pair == 3) {
+						// turn the fat fucking pig on
+                        wattron(thermal_win_str, COLOR_PAIR(color_pair) | A_BOLD);
+                    } else {
+                        wattron(thermal_win_str, COLOR_PAIR(color_pair));
+                    }
+                }
+
+                // wow, this thing printing temperature
+                mvwprintw(thermal_win_str, 1 + (int)i, 35, "%3dC", temp_c);
+
+                // turn off this shit
+                if (color_pair > 0) {
+                    if (color_pair == 3) {
+						// turn the fat fucking pig off
+                        wattroff(thermal_win_str, COLOR_PAIR(color_pair) | A_BOLD);
+                    } else {
+                        wattroff(thermal_win_str, COLOR_PAIR(color_pair));
+                    }
+                }
+			}
         }
 
 		if (parse_meminfo(&mem) == 0) {
@@ -166,7 +219,6 @@ int main() {
 
 			long used_kb = mem.total - mem.available;
 			format_bytes(used_kb, used_str, sizeof(used_str));
-
 		
 			mvwprintw(memwin, 1, 20, "%s/%s", used_str, total_str);
 			mvwprintw(memwin, 2, 20, "%s/%s", free_str, cached_str);
@@ -182,18 +234,19 @@ int main() {
 
         wrefresh(thermal_win_str);
 		wrefresh(memwin);
+
+		// CTRL + C is better
 		int ch = wgetch(thermal_win_str);
 		if (ch == 'q') keep_running = 0;
     }
+
+	// bye :(
     delwin(thermal_win_str);
 	delwin(memwin);
     endwin();
 
     if (glob_success) {
 		globfree(&g_zones);
-	}
-
-    printf("Exiting...\n");
     return EXIT_SUCCESS;
 }
 
