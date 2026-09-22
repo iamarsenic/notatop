@@ -4,7 +4,6 @@
 #include "../include/read.h"
 
 int read_string(const char *pattern, char buffer[][64], size_t max_items, size_t buffer_size) {
-	int i = 0;
 	glob_t glob_result;
 	if (glob(pattern, 0, NULL, &glob_result) != 0) {
 		return 0;
@@ -52,3 +51,4 @@ long read_long(const char *path) {
 	fclose(fl);
 	return val;
 }
+

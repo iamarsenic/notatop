@@ -1,4 +1,5 @@
 #define MAX_ZONES 10
+#define NOTATOP_VERSION "1.15.1"
 
 #include <stdlib.h>
 #include <stdio.h>
@@ -99,12 +100,12 @@ int main() {
 
 	// Mem window
 	mem_win.height	 = win_height;
-	mem_win.width	 = 35;
+	mem_win.width	 = 60;
 	mem_win.start_y	 = 2 + win_height;
 	mem_win.start_x	 = 45;
 	WINDOW *memwin	 = newwin(mem_win.height, mem_win.width, mem_win.start_y, mem_win.start_x);
 
-	wtimeout(thermal_win.win, 100);
+	wtimeout(thermal_win_str, 100);
 	wtimeout(memwin, 100);
 
 	// Memory
@@ -112,9 +113,16 @@ int main() {
 
     keypad(stdscr, TRUE);
 
+
+	// Writing beatiful text
+	mvwprintw(memwin, 1, 2, "Used/Total:");
+	mvwprintw(memwin, 2, 2, "Free/Cached:");
+	mvwprintw(memwin, 3, 2, "Available:");
+	mvwprintw(memwin, 4, 2, "Mapped:");
+	mvwprintw(memwin, 5, 2, "Active/Inactive:");
+
 	while(keep_running) {
         werase(thermal_win_str);
-		werase(memwin);
 
         box(thermal_win_str, 0, 0);
 		box(memwin, 0, 0);
@@ -124,10 +132,8 @@ int main() {
         char time_str[20];
         strftime(time_str, sizeof(time_str), "%H:%M:%S", t);
 		
-		// yay 1.15 is release :3
-        mvwprintw(thermal_win_str, 0, 3, " NotATop v1.15 | %s ", time_str);
-        mvwprintw(thermal_win_str, win_height - 1, 3, " Thermal ");
-		mvwprintw(memwin, win_height - 1, 3, " Memory Info ");
+		// in new patch i added some thinks... newermind!
+		mvwprintw(thermal_win_str, 0, 3, " NotATop v%s | %s ", NOTATOP_VERSION, time_str);
 
         for (size_t i = 0; i < zone_count; i++) {
             read_string(zones[i].type_path, &zones[i].name, 1, sizeof(zones[i].name));
@@ -145,27 +151,39 @@ int main() {
 			char avail_str[32];
 			char used_str[32];
 			char mapped_str[32];
+			char free_str[32];
+			char cached_str[32];
+			char active_str[32];
+			char inactive_str[32];
 
-			format_bytes(mem.mem_total, total_str, sizeof(total_str));
-			format_bytes(mem.mem_available, avail_str, sizeof(avail_str));
+			format_bytes(mem.total, total_str, sizeof(total_str));
+			format_bytes(mem.available, avail_str, sizeof(avail_str));
 			format_bytes(mem.mapped, mapped_str, sizeof(mapped_str));
+			format_bytes(mem.free, free_str, sizeof(free_str));
+			format_bytes(mem.cached, cached_str, sizeof(cached_str));
+			format_bytes(mem.active, active_str, sizeof(active_str));
+			format_bytes(mem.inactive, inactive_str, sizeof(inactive_str));
 
-			long used_kb = mem.mem_total - mem.mem_available;
+			long used_kb = mem.total - mem.available;
 			format_bytes(used_kb, used_str, sizeof(used_str));
 
-			mvwprintw(memwin, 1, 2, "Total:           %s", total_str);
-			mvwprintw(memwin, 2, 2, "Used:            %s", used_str);
-			mvwprintw(memwin, 3, 2, "Available:       %s", avail_str);
-			mvwprintw(memwin, 4, 2, "Mapped:          %s", mapped_str);
+		
+			mvwprintw(memwin, 1, 20, "%s/%s", used_str, total_str);
+			mvwprintw(memwin, 2, 20, "%s/%s", free_str, cached_str);
+			mvwprintw(memwin, 3, 20, "%s", avail_str);
+			mvwprintw(memwin, 4, 20, "%s", mapped_str);
+			mvwprintw(memwin, 5, 20, "%s/%s", active_str, inactive_str);
 		} else {
 			mvwprintw(memwin, 1, 2, "[!] Error: Failed to read meminfo: %s", strerror(errno));
 			fprintf(stderr, "[!] Main: Failed to read meminfo: %s", strerror(errno));
 		}
 
-        mvwprintw(thermal_win_str, thermal_win.height - 2, 2, "Ctrl+C to exit");
+        mvwprintw(thermal_win_str, thermal_win.height - 2, 2, "Q to exit");
 
         wrefresh(thermal_win_str);
 		wrefresh(memwin);
+		int ch = wgetch(thermal_win_str);
+		if (ch == 'q') keep_running = 0;
     }
     delwin(thermal_win_str);
 	delwin(memwin);
@@ -178,3 +196,4 @@ int main() {
     printf("Exiting...\n");
     return EXIT_SUCCESS;
 }
+

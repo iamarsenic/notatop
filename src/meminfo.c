@@ -13,9 +13,13 @@ int parse_meminfo(SystemMemory *mem) {
 
 	char buffer[256];
 
-	mem->mem_total		= 0;
-	mem->mem_available	= 0;
+	mem->free			= 0;
+	mem->total			= 0;
+	mem->available		= 0;
 	mem->mapped			= 0;
+	mem->cached			= 0;
+	mem->active			= 0;
+	mem->inactive		= 0;
 
 	while (fgets(buffer, sizeof(buffer), file) != NULL) {
 		buffer[strcspn(buffer, "\r\n")] = 0;
@@ -28,12 +32,20 @@ int parse_meminfo(SystemMemory *mem) {
 
 		long val = atol(value_str);
 
-		if (strcmp(key, "MemTotal") == 0) {
-			mem->mem_total = val;
-		} else if (strcmp(key, "MemAvailable") == 0) {
-			mem->mem_available = val;
-		} else if (strcmp(key, "Mapped") == 0) {
-			mem->mapped = val;
+		if (strcmp(key, "MemTotal")				== 0) {
+			mem->total			= val;
+		} else if (strcmp(key, "MemAvailable")	== 0) {
+			mem->available		= val;
+		} else if (strcmp(key, "Mapped")		== 0) {
+			mem->mapped			= val;
+		} else if (strcmp(key, "MemFree")		== 0) {
+			mem->free			= val;
+		} else if (strcmp(key, "Cached")		== 0) {
+			mem->cached			= val;
+		} else if (strcmp(key, "Active")		== 0) {
+			mem->active			= val;
+		} else if (strcmp(key, "Inactive")		== 0) {
+			mem->inactive		= val;
 		}
 	}
 

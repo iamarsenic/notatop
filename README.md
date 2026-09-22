@@ -1,4 +1,4 @@
-# NotATop v1.1
+# NotATop v1.15.1
 
 Choose language / Выберите язык / Selecciona el idioma:
 * [English](#english)
