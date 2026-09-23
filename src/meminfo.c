@@ -1,54 +1,30 @@
+#include "../include/meminfo.h"
 #include <stdio.h>
 #include <string.h>
-#include <stdlib.h>
-
-#include "../include/meminfo.h"
 
 int parse_meminfo(SystemMemory *mem) {
-	FILE *file = fopen("/proc/meminfo", "r");
-	if (file == NULL) {
-		perror("Error opening /proc/meminfo");
-		return -1;
-	}
+    FILE *fp = fopen("/proc/meminfo", "r");
+    if (!fp) return -1;
 
-	char buffer[256];
+    memset(mem, 0, sizeof(SystemMemory));
 
-	mem->free			= 0;
-	mem->total			= 0;
-	mem->available		= 0;
-	mem->mapped			= 0;
-	mem->cached			= 0;
-	mem->active			= 0;
-	mem->inactive		= 0;
+    char line[256];
+    char label[64];
+    long value;
 
-	while (fgets(buffer, sizeof(buffer), file) != NULL) {
-		buffer[strcspn(buffer, "\r\n")] = 0;
+    while (fgets(line, sizeof(line), fp) != NULL) {
+        if (sscanf(line, "%63s %ld", label, &value) == 2) {
+            if (strcmp(label, "MemTotal:") == 0) mem->total = value;
+            else if (strcmp(label, "MemFree:") == 0) mem->free = value;
+            else if (strcmp(label, "MemAvailable:") == 0) mem->available = value;
+            else if (strcmp(label, "Buffers:") == 0) mem->buffers = value;
+            else if (strcmp(label, "Cached:") == 0) mem->cached = value;
+            else if (strcmp(label, "Active:") == 0) mem->active = value;
+            else if (strcmp(label, "Inactive:") == 0) mem->inactive = value;
+            else if (strcmp(label, "Mapped:") == 0) mem->mapped = value;
+        }
+    }
 
-		char *key = strtok(buffer, ": \t");
-		if (key == NULL) continue;
-
-		char *value_str = strtok(NULL, ": \t");
-		if (value_str == NULL) continue;
-
-		long val = atol(value_str);
-
-		if (strcmp(key, "MemTotal")				== 0) {
-			mem->total			= val;
-		} else if (strcmp(key, "MemAvailable")	== 0) {
-			mem->available		= val;
-		} else if (strcmp(key, "Mapped")		== 0) {
-			mem->mapped			= val;
-		} else if (strcmp(key, "MemFree")		== 0) {
-			mem->free			= val;
-		} else if (strcmp(key, "Cached")		== 0) {
-			mem->cached			= val;
-		} else if (strcmp(key, "Active")		== 0) {
-			mem->active			= val;
-		} else if (strcmp(key, "Inactive")		== 0) {
-			mem->inactive		= val;
-		}
-	}
-
-	fclose(file);
-	return 0;
+    fclose(fp);
+    return 0;
 }

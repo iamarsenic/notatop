@@ -50,7 +50,7 @@ After a successful build, the executable binary will appear in the `build` direc
 Why **NotATop**? Because RAM benchmarks, performance tests, and other advanced features will be added soon. As you know, standard `top` utilities usually cannot do that. However, since this is just the first version, I am still figuring out the best way to implement these ideas.
 
 ### SPOILERS
-* **vent rpm:** coming soon...
+* **vent rpm:** coming soon... oh, sorry.. NOW!
 ---
 
 ## Русский
@@ -96,4 +96,4 @@ cmake --build build
 Почему **NotATop**? Потому что в скором времени туда будут добавлены тесты оперативной памяти, производительности и другие фичи. Вы же знаете, что далеко не каждый `top` так умеет. Но так как это пока первая версия, я еще думаю над тем, как лучше всего это реализовать.
 
 ### СПОЙЛЕРЫ
-* **обороты вентилятора:** скоро...
+* **обороты вентилятора:** скоро... точнее сейчас!

@@ -1,24 +1,26 @@
 cmake_minimum_required(VERSION 3.10)
-project(NotATop C)
+project(notatop C)
 
 set(CMAKE_C_STANDARD 11)
-set(CMAKE_C_FLAGS "${CMAKE_C_FLAGS} -march=native -flto -O3 -pipe -Wall -Wextra")
-set(CMAKE_BUILD_TYPE Debug)
-add_compile_options(-g)
+set(CMAKE_C_STANDARD_REQUIRED ON)
 
-add_executable(nat
-	src/main.c
-	src/read.c
-	src/meminfo.c
-	src/logger.c
+set(CMAKE_C_FLAGS "${CMAKE_C_FLAGS} -Wall -Wextra -O2")
+
+include_directories(include)
+
+add_executable(nat 
+    src/main.c 
+    src/thermal.c 
+    src/fan.c
+    src/ui.c
+    src/meminfo.c 
+    src/logger.c
+    src/read.c
 )
 
 find_package(Curses REQUIRED)
-target_include_directories(nat PRIVATE ${CMAKE_CURRENT_SOURCE_DIR}/src)
-target_link_libraries(nat PRIVATE ${CURSES_LIBRARIES} m)
 
-install(TARGETS nat	DESTINATION bin)
+target_include_directories(nat PRIVATE ${CURSES_INCLUDE_DIRS})
 
-add_custom_target(uninstall
-	COMMAND xargs rm -fv < ${CMAKE_CURRENT_BINARY_DIR}/install_manifest.txt
-)
+target_link_libraries(nat PRIVATE ${CURSES_LIBRARIES})
+
