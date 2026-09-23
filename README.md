@@ -1,4 +1,4 @@
-# NotATop v1.16.0
+# NotATop v1.17.0
 
 Choose language / Выберите язык:
 * [English](#english)
@@ -13,7 +13,7 @@ A console utility designed to read PC sensors (supports up to 10 sensors).
 > **Note:** Developed and tested on Gentoo Linux on Lenovo ThinkPad L14 Gen 1.
 
 ### WHAT'S NEW
-* **Temp Colors and RAM Usage:** now we have something needs for compilation
+* **CPU FREQ:** yay we have a cpu freq :3
 
 ### Features
 * **No arguments needed:** Runs very simply. Just use `./nat`, or run `nat` if installed via `make install` to `/usr/local/bin`.
@@ -50,7 +50,7 @@ After a successful build, the executable binary will appear in the `build` direc
 Why **NotATop**? Because RAM benchmarks, performance tests, and other advanced features will be added soon. As you know, standard `top` utilities usually cannot do that. However, since this is just the first version, I am still figuring out the best way to implement these ideas.
 
 ### SPOILERS
-* **vent rpm:** coming soon... oh, sorry.. NOW!
+* **First Test:** coming soon...
 ---
 
 ## Русский
@@ -58,6 +58,9 @@ Why **NotATop**? Because RAM benchmarks, performance tests, and other advanced f
 Консольная утилита, созданная для считывания датчиков ПК (поддерживает до 10 штук).
 
 > **Примечание:** Разработано и протестировано на дистрибутиве Gentoo Linux который на Lenovo ThinkPad L14 Gen 1.
+
+### ЧТО НОВОГО
+* **Частота процессора:** теперь у нас есть частота процессора... зашибись.
 
 ### Особенности
 * **Без аргументов:** Запускается максимально просто и понятно с помощью `./nat`. Если утилита установлена в `/usr/local/bin` через `make install`, достаточно ввести `nat`.
@@ -96,4 +99,4 @@ cmake --build build
 Почему **NotATop**? Потому что в скором времени туда будут добавлены тесты оперативной памяти, производительности и другие фичи. Вы же знаете, что далеко не каждый `top` так умеет. Но так как это пока первая версия, я еще думаю над тем, как лучше всего это реализовать.
 
 ### СПОЙЛЕРЫ
-* **обороты вентилятора:** скоро... точнее сейчас!
+* **Первые Тесты:** скоро...
