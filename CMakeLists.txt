@@ -16,6 +16,7 @@ add_executable(nat
     src/meminfo.c 
     src/logger.c
     src/read.c
+	src/cpufreq.c
 )
 
 find_package(Curses REQUIRED)
