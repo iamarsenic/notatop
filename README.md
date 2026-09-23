@@ -41,7 +41,7 @@ make
 git clone https://github.com/iamarsenic/notatop.git
 cd notatop
 mkdir build
-cmake -B build -G ninja
+cmake -B build -G Ninja
 cmake --build build
 ```
 After a successful build, the executable binary will appear in the `build` directory.
