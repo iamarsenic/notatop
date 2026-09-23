@@ -1,30 +1,55 @@
+#define _GNU_SOURCE
 #include "../include/meminfo.h"
 #include <stdio.h>
 #include <string.h>
+#include <stdlib.h>
+#include <unistd.h>
+#include <fcntl.h>
+
+static inline long parse_field(const char *buf, const char *label) {
+    const char *pos = strstr(buf, label);
+    if (pos) {
+        return strtol(pos + strlen(label), nullptr, 10);
+    }
+    return 0;
+}
 
 int parse_meminfo(SystemMemory *mem) {
-    FILE *fp = fopen("/proc/meminfo", "r");
-    if (!fp) return -1;
+    static int mem_fd = -1;
+    static bool init_failed = false;
 
-    memset(mem, 0, sizeof(SystemMemory));
+    if (init_failed) return -1;
 
-    char line[256];
-    char label[64];
-    long value;
-
-    while (fgets(line, sizeof(line), fp) != NULL) {
-        if (sscanf(line, "%63s %ld", label, &value) == 2) {
-            if (strcmp(label, "MemTotal:") == 0) mem->total = value;
-            else if (strcmp(label, "MemFree:") == 0) mem->free = value;
-            else if (strcmp(label, "MemAvailable:") == 0) mem->available = value;
-            else if (strcmp(label, "Buffers:") == 0) mem->buffers = value;
-            else if (strcmp(label, "Cached:") == 0) mem->cached = value;
-            else if (strcmp(label, "Active:") == 0) mem->active = value;
-            else if (strcmp(label, "Inactive:") == 0) mem->inactive = value;
-            else if (strcmp(label, "Mapped:") == 0) mem->mapped = value;
+    if (mem_fd < 0) {
+        mem_fd = open("/proc/meminfo", O_RDONLY);
+        if (mem_fd < 0) {
+            init_failed = true;
+            return -1;
         }
     }
 
-    fclose(fp);
+    if (lseek(mem_fd, 0, SEEK_SET) == -1) {
+        return -1;
+    }
+
+    char buffer[2048];
+    ssize_t bytes_read = read(mem_fd, buffer, sizeof(buffer) - 1);
+    if (bytes_read <= 0) {
+        return -1;
+    }
+    buffer[bytes_read] = '\0'; // close this
+
+    memset(mem, 0, sizeof(SystemMemory));
+
+    mem->total     = parse_field(buffer, "MemTotal:");
+    mem->free      = parse_field(buffer, "MemFree:");
+    mem->available = parse_field(buffer, "MemAvailable:");
+    mem->buffers   = parse_field(buffer, "Buffers:");
+    mem->cached    = parse_field(buffer, "Cached:");
+    mem->active    = parse_field(buffer, "Active:");
+    mem->inactive  = parse_field(buffer, "Inactive:");
+    mem->mapped    = parse_field(buffer, "Mapped:");
+
     return 0;
 }
+

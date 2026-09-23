@@ -1,55 +1,53 @@
+#define _GNU_SOURCE
 #include "../include/thermal.h"
 #include <stdio.h>
+#include <stdlib.h>
 #include <string.h>
+#include <unistd.h>
+#include <fcntl.h>
 #include <glob.h>
 
-// Будем удерживать файлы температур открытыми
-static FILE *g_temp_files[MAX_ZONES] = {nullptr};
+static int g_temp_fds[MAX_ZONES] = {-1};
 static char g_zone_names[MAX_ZONES][64];
 static int zone_count = 0;
 static int initialized = 0;
 
 int init_thermal(void) {
     glob_t glob_result;
-    
-    // Ищем все папки hwmon в системе
     if (glob("/sys/class/thermal/../hwmon/hwmon*", 0, nullptr, &glob_result) != 0) {
         return -1;
     }
 
     char target_path[256] = "";
 
-    // Шаг 1: Ищем, какая именно папка hwmonX принадлежит процессору
     for (size_t i = 0; i < glob_result.gl_pathc; i++) {
         char name_path[256];
         char name_buf[64] = "";
         
         snprintf(name_path, sizeof(name_path), "%s/name", glob_result.gl_pathv[i]);
-        FILE *f_name = fopen(name_path, "r");
-        
-        if (f_name) {
-            if (fgets(name_buf, sizeof(name_buf), f_name)) {
+        int fd_name = open(name_path, O_RDONLY);
+        if (fd_name >= 0) {
+            ssize_t len = read(fd_name, name_buf, sizeof(name_buf) - 1);
+            if (len > 0) {
+                name_buf[len] = '\0';
                 name_buf[strcspn(name_buf, "\r\n")] = '\0';
             }
-            fclose(f_name);
+            close(fd_name);
         }
 
-        // Драйверы процессоров: coretemp (Intel) или k10temp (AMD)
         if (strcmp(name_buf, "coretemp") == 0 || strcmp(name_buf, "k10temp") == 0) {
             strncpy(target_path, glob_result.gl_pathv[i], sizeof(target_path) - 1);
             break; 
         }
     }
 
-    // Если процессорный hwmon не найден, освобождаем glob и выходим
     if (strlen(target_path) == 0) {
         globfree(&glob_result);
         return -1;
     }
 
-    // Шаг 2: Внутри найденной папки ищем все доступные датчики температуры (temp*_input)
     glob_t temp_glob;
-    char temp_pattern[300];
+    char temp_pattern[256];
     snprintf(temp_pattern, sizeof(temp_pattern), "%s/temp*_input", target_path);
 
     if (glob(temp_pattern, 0, nullptr, &temp_glob) == 0) {
@@ -57,29 +55,24 @@ int init_thermal(void) {
         if (zone_count > MAX_ZONES) zone_count = MAX_ZONES;
 
         for (int i = 0; i < zone_count; i++) {
-            // Открываем файл температуры и оставляем дескриптор в памяти
-            g_temp_files[i] = fopen(temp_glob.gl_pathv[i], "r");
+            g_temp_fds[i] = open(temp_glob.gl_pathv[i], O_RDONLY);
 
-            // Пытаемся прочитать человеческое имя датчика (например, temp1_label -> "Package id 0")
-            char label_path[350];
+            char label_path[256];
             strncpy(label_path, temp_glob.gl_pathv[i], sizeof(label_path) - 1);
-            
-            // Подменяем "_input" на "_label" в пути к файлу
             char *sub = strstr(label_path, "_input");
-            if (sub) {
-                strcpy(sub, "_label");
-            }
+            if (sub) strcpy(sub, "_label");
 
-            FILE *f_label = fopen(label_path, "r");
-            if (f_label) {
-                if (fgets(g_zone_names[i], sizeof(g_zone_names[i]), f_label)) {
+            int fd_label = open(label_path, O_RDONLY);
+            if (fd_label >= 0) {
+                ssize_t len = read(fd_label, g_zone_names[i], sizeof(g_zone_names[i]) - 1);
+                if (len > 0) {
+                    g_zone_names[i][len] = '\0';
                     g_zone_names[i][strcspn(g_zone_names[i], "\r\n")] = '\0';
                 } else {
                     snprintf(g_zone_names[i], sizeof(g_zone_names[i]), "Core %d", i);
                 }
-                fclose(f_label);
+                close(fd_label);
             } else {
-                // Если файла label нет (на AMD часто бывает), пишем просто Core X
                 snprintf(g_zone_names[i], sizeof(g_zone_names[i]), "Core %d", i);
             }
         }
@@ -97,18 +90,18 @@ ThermalPayload update_thermal(void) {
     if (!initialized) return payload;
 
     for (int i = 0; i < zone_count; i++) {
-        // Копируем имя из кэша
         strncpy(payload.zones[i].name, g_zone_names[i], sizeof(payload.zones[i].name) - 1);
 
         long temp_raw = -1;
-        if (g_temp_files[i]) {
-            rewind(g_temp_files[i]);
-            if (fscanf(g_temp_files[i], "%ld", &temp_raw) != 1) {
-                temp_raw = -1;
+        if (g_temp_fds[i] >= 0) {
+            char buf[32];
+            ssize_t bytes_read = pread(g_temp_fds[i], buf, sizeof(buf) - 1, 0);
+            if (bytes_read > 0) {
+                buf[bytes_read] = '\0';
+                temp_raw = strtol(buf, nullptr, 10);
             }
         }
 
-        // hwmon отдает температуру в миллиградусах (например, 45000 вместо 45), делим на 1000
         payload.zones[i].temp = (temp_raw != -1) ? (int)(temp_raw / 1000) : -1;
     }
     return payload;
@@ -117,9 +110,9 @@ ThermalPayload update_thermal(void) {
 void free_thermal(void) {
     if (initialized) {
         for (int i = 0; i < zone_count; i++) {
-            if (g_temp_files[i]) {
-                fclose(g_temp_files[i]);
-                g_temp_files[i] = nullptr;
+            if (g_temp_fds[i] >= 0) {
+                close(g_temp_fds[i]);
+                g_temp_fds[i] = -1;
             }
         }
         initialized = 0;
