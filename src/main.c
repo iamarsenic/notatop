@@ -5,6 +5,7 @@
 #include "../include/thermal.h"
 #include "../include/fan.h"
 #include "../include/meminfo.h"
+#include "../include/cpufreq.h"
 #include "../include/ui.h"
 #include "../include/logger.h"
 
@@ -26,6 +27,11 @@ int main(void) {
         active_zones = 0;
     }
 
+    int cpu_cores = init_cpufreq();
+    if (cpu_cores < 0) {
+        cpu_cores = 0;
+    }
+
     init_tui_graphics();
     TUI_Layout layout = create_tui_layout(active_zones);
 
@@ -35,10 +41,11 @@ int main(void) {
 
     while (keep_running) {
         ThermalPayload thermal = update_thermal();
+        CPUFreqPayload cpufreq = update_cpufreq();
         long fan_rpm           = get_fan_rpm();
         parse_meminfo(&mem);
 
-        render_tui_frame(&layout, &thermal, &mem, fan_rpm);
+        render_tui_frame(&layout, &thermal, &mem, &cpufreq, fan_rpm);
 
         int ch = wgetch(layout.thermal_win);
         if (ch == 'q' || ch == 'Q') {
@@ -49,6 +56,7 @@ int main(void) {
     destroy_tui_layout(&layout);
     endwin(); 
     free_thermal();
+    free_cpufreq();
     
     return EXIT_SUCCESS;
 }
