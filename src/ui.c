@@ -1,8 +1,11 @@
+#define _GNU_SOURCE
 #include "../include/ui.h"
+#include "../include/cpufreq.h"
 #include <time.h>
 #include <string.h>
+#include <stdio.h>
 
-#define NOTATOP_VERSION "1.16.0"
+#define NOTATOP_VERSION "1.17.0"
 
 static void format_bytes(long kb, char *dest, size_t dest_size) {
     double value = (double)kb;
@@ -19,27 +22,36 @@ void init_tui_graphics(void) {
     initscr(); clear(); cbreak(); noecho(); curs_set(0);
     if (has_colors()) {
         start_color(); use_default_colors();
-        init_pair(1, COLOR_YELLOW, -1);       // 70-79 C
-        init_pair(2, COLOR_RED, -1);          // 80-89 C
-        init_pair(3, COLOR_BLACK, COLOR_RED); // LAVA AT 90 C+
+        init_pair(1, COLOR_YELLOW, -1);       
+        init_pair(2, COLOR_RED, -1);          
+        init_pair(3, COLOR_BLACK, COLOR_RED); 
     }
     timeout(100);
     keypad(stdscr, TRUE);
 }
 
 TUI_Layout create_tui_layout(int active_zones) {
+    (void)active_zones;
     TUI_Layout layout;
-    layout.thermal_height = (active_zones + 4 < 8) ? 8 : active_zones + 4;
     
-    layout.thermal_win = newwin(layout.thermal_height, 40, 2, 5);
-    layout.mem_win     = newwin(7, 60, 2, 48);
-    layout.rpm_win     = newwin(5, 60, 2 + 7 + 1, 48);
+    layout.thermal_height = 17; 
+    layout.thermal_win    = newwin(17, 40, 2, 5); 
+    
+    layout.mem_win     = newwin(7, 60, 2, 48);          
+    layout.freq_win    = newwin(4, 60, 2 + 7 + 1, 48);  
+    layout.rpm_win     = newwin(4, 60, 2 + 7 + 1 + 4 + 1, 48); 
+    
     return layout;
 }
 
-void render_tui_frame(const TUI_Layout *layout, const ThermalPayload *thermal, const SystemMemory *mem, long fan_rpm) {
-    werase(layout->thermal_win); werase(layout->mem_win); werase(layout->rpm_win);
-    box(layout->thermal_win, 0, 0); box(layout->mem_win, 0, 0); box(layout->rpm_win, 0, 0);
+void render_tui_frame(const TUI_Layout *layout, const ThermalPayload *thermal, 
+                      const SystemMemory *mem, const CPUFreqPayload *cpufreq, long fan_rpm) {
+    
+    werase(layout->thermal_win); werase(layout->mem_win); 
+    werase(layout->freq_win);    werase(layout->rpm_win);
+    
+    box(layout->thermal_win, 0, 0); box(layout->mem_win, 0, 0); 
+    box(layout->freq_win, 0, 0);    box(layout->rpm_win, 0, 0);
 
     time_t now = time(NULL);
     struct tm *t = localtime(&now);
@@ -48,10 +60,10 @@ void render_tui_frame(const TUI_Layout *layout, const ThermalPayload *thermal, c
 
     mvwprintw(layout->thermal_win, 0, 3, " NotATop v%s | %s ", NOTATOP_VERSION, time_str);
     mvwprintw(layout->mem_win, 0, 3, " Memory ");
+    mvwprintw(layout->freq_win, 0, 3, " CPU Core Frequencies ");
     mvwprintw(layout->rpm_win, 0, 3, " Cooling / Fan ");
 
-    // --- РЕНДЕР ТЕМПЕРАТУР ---
-    for (int i = 0; i < thermal->count; i++) {
+    for (int i = 0; i < thermal->count && i < (layout->thermal_height - 3); i++) {
         int temp_c = thermal->zones[i].temp;
         mvwprintw(layout->thermal_win, 1 + i, 2, "[%d] %-25s", i, thermal->zones[i].name);
 
@@ -95,7 +107,10 @@ void render_tui_frame(const TUI_Layout *layout, const ThermalPayload *thermal, c
     mvwprintw(layout->mem_win, 4, 20, "%s", m_str);
     mvwprintw(layout->mem_win, 5, 20, "%s/%s", ac_str, ic_str);
 
-    // --- РЕНДЕР КУЛЕРА ---
+    for (int i = 0; i < cpufreq->count && i < 4; i++) {
+        mvwprintw(layout->freq_win, 1, 2 + (i * 14), "CPU%d: %4ldM", i, cpufreq->freqs[i]);
+    }
+
     mvwprintw(layout->rpm_win, 1, 2, "Fan Speed:");
     if (fan_rpm > 0) {
         wattron(layout->rpm_win, A_BOLD);
@@ -112,10 +127,12 @@ void render_tui_frame(const TUI_Layout *layout, const ThermalPayload *thermal, c
     wrefresh(stdscr);
     wrefresh(layout->thermal_win); 
     wrefresh(layout->mem_win); 
+    wrefresh(layout->freq_win);
     wrefresh(layout->rpm_win);
 }
 
 void destroy_tui_layout(TUI_Layout *layout) {
-    delwin(layout->thermal_win); delwin(layout->mem_win); delwin(layout->rpm_win);
+    delwin(layout->thermal_win); delwin(layout->mem_win); 
+    delwin(layout->freq_win);    delwin(layout->rpm_win);
 }
 
