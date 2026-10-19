@@ -65,7 +65,7 @@ TUI_Layout create_tui_layout(int active_zones) {
     // Left column layout configurations (X = 5, Width = 40)
     layout.thermal_height = 10; 
     layout.thermal_win    = init_window_block(10, 40, 2, 5, title_buf); 
-    layout.load_win       = init_window_block(5, 40, 13, 5, "System Load (LA)"); 
+    layout.load_win       = init_window_block(3, 40, 13, 5, "System Load (LA)"); 
     
     // Right column layout configurations (X = 48, Width = 60)
     layout.mem_win     = init_window_block(7, 60, 2, 48, "Memory");          
@@ -117,7 +117,7 @@ void render_tui_frame(const TUI_Layout *layout, const ThermalPayload *thermal,
     // --- 2. Render Load Average Data ---
     LoadAvg load = get_system_load();
     if (load.success) {
-        mvwprintw(layout->load_win, 3, 2, "Load Average: %.2f/%.2f%.2f", load.min_1, load.min_5, load.min_15);
+        mvwprintw(layout->load_win, 1, 2, "Load Average: %.2f/%.2f%.2f", load.min_1, load.min_5, load.min_15);
     } else {
         mvwprintw(layout->load_win, 1, 2, "LA metrics error");
     }

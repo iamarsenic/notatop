@@ -1,6 +1,8 @@
 cmake_minimum_required(VERSION 3.20)
 
-set(CMAKE_C_COMPILER clang cc gcc) # added my favorite C compiler - clang
+set(CMAKE_C_COMPILER_LIST clang cc gcc) # added my favorite C compiler - clang
+
+cmake_policy(SET CMP0135 NEW)
 
 project(NotATop LANGUAGES C)
 
@@ -26,6 +28,7 @@ FetchContent_Declare(
     ncurses
     URL https://ftp.gnu.org/gnu/ncurses/ncurses-6.5.tar.gz
 )
+
 
 set(NCURSES_ENABLE_WIDE_CHAR ON CACHE BOOL "" FORCE) 
 set(BUILD_SHARED_LIBS OFF CACHE BOOL "" FORCE)       

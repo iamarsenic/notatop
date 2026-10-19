@@ -57,7 +57,7 @@ int init_thermal(void) {
         for (int i = 0; i < zone_count; i++) {
             g_temp_fds[i] = open(temp_glob.gl_pathv[i], O_RDONLY);
 
-            char label_path[256];
+            char label_path[512];
             strncpy(label_path, temp_glob.gl_pathv[i], sizeof(label_path) - 1);
             char *sub = strstr(label_path, "_input");
             if (sub) strcpy(sub, "_label");
