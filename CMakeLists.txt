@@ -1,10 +1,12 @@
 cmake_minimum_required(VERSION 3.10)
 project(notatop C)
 
+set(CMAKE_C_COMPILER "clang")
+set(CMAKE_CXX_COMPILER "clang++")
 set(CMAKE_C_STANDARD 23)
 set(CMAKE_C_STANDARD_REQUIRED ON)
 
-set(CMAKE_C_FLAGS "${CMAKE_C_FLAGS} -Wall -Wextra -O2")
+set(CMAKE_C_FLAGS "${CMAKE_C_FLAGS} -Wall -Wextra -Werror -O2")
 
 include_directories(include)
 
@@ -17,6 +19,7 @@ add_executable(nat
     src/logger.c
     src/read.c
 	src/cpufreq.c
+	src/loadaverage.c
 )
 
 find_package(Curses REQUIRED)
