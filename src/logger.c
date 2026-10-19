@@ -16,7 +16,7 @@ typedef struct {
 void init_logging() {
 	HaveStatus have = {0, 0};
 	char log_dir[512];
-	char log_path[512];
+	char log_path[1024];
 
 	const char *xdg_data = getenv("XDG_DATA_HOME");
 	const char *home = getenv("HOME");

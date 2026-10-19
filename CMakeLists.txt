@@ -1,4 +1,7 @@
 cmake_minimum_required(VERSION 3.20)
+
+set(CMAKE_C_COMPILER clang cc gcc) # added my favorite C compiler - clang
+
 project(NotATop LANGUAGES C)
 
 set(CMAKE_C_STANDARD 23)
