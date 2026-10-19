@@ -30,12 +30,12 @@ void init_logging() {
 	}
 
 	if (!have.home) {
-		fprintf(stderr, "[!] $HOME var not found. Using /tmp/notatop/log.\n");
+		fprintf(stderr, "[!] $HOME var not found. Using /tmp/notatop/log/\n");
 		snprintf(log_dir, sizeof(log_dir), "%s", "/tmp/notatop/log");
 	} else if (have.xdg) {
 		snprintf(log_dir, sizeof(log_dir), "%s/notatop", xdg_data);
 	} else {
-		fprintf(stderr, "[.] $XDG_HOME_DIR is not set. Using $HOME/.local/state/notatop\n");
+		fprintf(stderr, "[.] $XDG_HOME_DIR is not set. Using $HOME/.local/state/notatop/\n");
 		snprintf(log_dir, sizeof(log_dir), "%s/.local/state/notatop/log", home);
 	}
 
