@@ -1,5 +1,7 @@
 build/
 
+README.md
+
 .cache/
 .vscode/
 .idea/
