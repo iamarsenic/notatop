@@ -1,12 +1,14 @@
 #define _GNU_SOURCE
 #include "../include/ui.h"
 #include "../include/cpufreq.h"
+#include "../include/loadaverage.h"
 #include <time.h>
 #include <string.h>
 #include <stdio.h>
 
-#define NOTATOP_VERSION "1.17.0"
+#define NOTATOP_VERSION "1.18.1"
 
+// Helper to format bytes into human-readable units
 static void format_bytes(long kb, char *dest, size_t dest_size) {
     double value = (double)kb;
     const char *units[] = {"kB", "MB", "GB", "TB"};
@@ -16,6 +18,25 @@ static void format_bytes(long kb, char *dest, size_t dest_size) {
         i++;
     }
     snprintf(dest, dest_size, "%.4f %s", value, units[i]);
+}
+
+// Universal helper function to reset window borders and inject titles safely
+static void reset_window_frame(WINDOW *win, const char *title) {
+    if (win == nullptr) return;
+    werase(win);
+    box(win, 0, 0);
+    if (title && title[0] != '\0') {
+        mvwprintw(win, 0, 3, "%s", title);
+    }
+}
+
+// Universal function to initialize an ncurses window block with a border and title
+static WINDOW *init_window_block(int height, int width, int y, int x, const char *title) {
+    WINDOW *win = newwin(height, width, y, x);
+    if (win == nullptr) return nullptr;
+
+    reset_window_frame(win, title);
+    return win;
 }
 
 void init_tui_graphics(void) {
@@ -34,12 +55,22 @@ TUI_Layout create_tui_layout(int active_zones) {
     (void)active_zones;
     TUI_Layout layout;
     
-    layout.thermal_height = 17; 
-    layout.thermal_win    = newwin(17, 40, 2, 5); 
+    // Fetch current time for the main header title
+    time_t now = time(nullptr);
+    struct tm *t = localtime(&now);
+    char title_buf[64] = {}; 
+    snprintf(title_buf, sizeof(title_buf), "NotATop v%s | %02d:%02d:%02d", 
+             NOTATOP_VERSION, t->tm_hour, t->tm_min, t->tm_sec);
+
+    // Left column layout configurations (X = 5, Width = 40)
+    layout.thermal_height = 10; 
+    layout.thermal_win    = init_window_block(10, 40, 2, 5, title_buf); 
+    layout.load_win       = init_window_block(5, 40, 13, 5, "System Load (LA)"); 
     
-    layout.mem_win     = newwin(7, 60, 2, 48);          
-    layout.freq_win    = newwin(4, 60, 2 + 7 + 1, 48);  
-    layout.rpm_win     = newwin(4, 60, 2 + 7 + 1 + 4 + 1, 48); 
+    // Right column layout configurations (X = 48, Width = 60)
+    layout.mem_win     = init_window_block(7, 60, 2, 48, "Memory");          
+    layout.freq_win    = init_window_block(4, 60, 10, 48, "CPU Core Frequencies"); 
+    layout.rpm_win     = init_window_block(4, 60, 15, 48, "Cooling / Fan");        
     
     return layout;
 }
@@ -47,22 +78,20 @@ TUI_Layout create_tui_layout(int active_zones) {
 void render_tui_frame(const TUI_Layout *layout, const ThermalPayload *thermal, 
                       const SystemMemory *mem, const CPUFreqPayload *cpufreq, long fan_rpm) {
     
-    werase(layout->thermal_win); werase(layout->mem_win); 
-    werase(layout->freq_win);    werase(layout->rpm_win);
-    
-    box(layout->thermal_win, 0, 0); box(layout->mem_win, 0, 0); 
-    box(layout->freq_win, 0, 0);    box(layout->rpm_win, 0, 0);
-
-    time_t now = time(NULL);
+    // Fetch current time for top bar dynamic clock update
+    time_t now = time(nullptr);
     struct tm *t = localtime(&now);
-    char time_str[20];
-    strftime(time_str, sizeof(time_str), "%H:%M:%S", t);
+    char time_str[64] = {}; 
+    snprintf(time_str, sizeof(time_str), " NotATop v%s | %02d:%02d:%02d ", NOTATOP_VERSION, t->tm_hour, t->tm_min, t->tm_sec);
 
-    mvwprintw(layout->thermal_win, 0, 3, " NotATop v%s | %s ", NOTATOP_VERSION, time_str);
-    mvwprintw(layout->mem_win, 0, 3, " Memory ");
-    mvwprintw(layout->freq_win, 0, 3, " CPU Core Frequencies ");
-    mvwprintw(layout->rpm_win, 0, 3, " Cooling / Fan ");
+    // Reset layout blocks using standard static C helper functions
+    reset_window_frame(layout->thermal_win, time_str);
+    reset_window_frame(layout->load_win, " System Load (LA) ");
+    reset_window_frame(layout->mem_win, " Memory ");
+    reset_window_frame(layout->freq_win, " CPU Core Frequencies ");
+    reset_window_frame(layout->rpm_win, " Cooling / Fan ");
 
+    // --- 1. Render Thermal Zones Data ---
     for (int i = 0; i < thermal->count && i < (layout->thermal_height - 3); i++) {
         int temp_c = thermal->zones[i].temp;
         mvwprintw(layout->thermal_win, 1 + i, 2, "[%d] %-25s", i, thermal->zones[i].name);
@@ -85,6 +114,15 @@ void render_tui_frame(const TUI_Layout *layout, const ThermalPayload *thermal,
         }
     }
 
+    // --- 2. Render Load Average Data ---
+    LoadAvg load = get_system_load();
+    if (load.success) {
+        mvwprintw(layout->load_win, 3, 2, "Load Average: %.2f/%.2f%.2f", load.min_1, load.min_5, load.min_15);
+    } else {
+        mvwprintw(layout->load_win, 1, 2, "LA metrics error");
+    }
+
+    // --- 3. Render Memory Allocation Data ---
     char t_str[32], a_str[32], u_str[32], m_str[32], f_str[32], c_str[32], ac_str[32], ic_str[32];
     format_bytes(mem->total, t_str, sizeof(t_str));
     format_bytes(mem->available, a_str, sizeof(a_str));
@@ -107,10 +145,12 @@ void render_tui_frame(const TUI_Layout *layout, const ThermalPayload *thermal,
     mvwprintw(layout->mem_win, 4, 20, "%s", m_str);
     mvwprintw(layout->mem_win, 5, 20, "%s/%s", ac_str, ic_str);
 
+    // --- 4. Render CPU Frequencies ---
     for (int i = 0; i < cpufreq->count && i < 4; i++) {
         mvwprintw(layout->freq_win, 1, 2 + (i * 14), "CPU%d: %4ldM", i, cpufreq->freqs[i]);
     }
 
+    // --- 5. Render Cooling Fan RPM ---
     mvwprintw(layout->rpm_win, 1, 2, "Fan Speed:");
     if (fan_rpm > 0) {
         wattron(layout->rpm_win, A_BOLD);
@@ -124,15 +164,19 @@ void render_tui_frame(const TUI_Layout *layout, const ThermalPayload *thermal,
 
     mvwprintw(layout->thermal_win, layout->thermal_height - 2, 2, "Q to exit");
     
-    wrefresh(stdscr);
-    wrefresh(layout->thermal_win); 
-    wrefresh(layout->mem_win); 
-    wrefresh(layout->freq_win);
-    wrefresh(layout->rpm_win);
+    /* refreshing all windows */
+	wnoutrefresh(stdscr);
+	wnoutrefresh(layout->thermal_win); 
+	wnoutrefresh(layout->load_win); 
+	wnoutrefresh(layout->mem_win); 
+	wnoutrefresh(layout->freq_win);
+	wnoutrefresh(layout->rpm_win);
+	doupdate(); /* i love this */
 }
-
 void destroy_tui_layout(TUI_Layout *layout) {
-    delwin(layout->thermal_win); delwin(layout->mem_win); 
-    delwin(layout->freq_win);    delwin(layout->rpm_win);
+    delwin(layout->thermal_win); 
+    delwin(layout->load_win); 
+    delwin(layout->mem_win);     delwin(layout->freq_win);    
+    delwin(layout->rpm_win);
 }
 

@@ -9,6 +9,7 @@ typedef struct {
     WINDOW *mem_win;
     WINDOW *freq_win;
     WINDOW *rpm_win;
+	WINDOW *load_win;
     int thermal_height;
 } TUI_Layout;
 
